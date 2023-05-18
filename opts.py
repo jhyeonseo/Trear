@@ -1,7 +1,6 @@
 import argparse
 parser = argparse.ArgumentParser(description="PyTorch implementation of DSCMT")
 parser.add_argument('dataset', type=str, choices=['pku', 'thu', 'ntu60', 'ntu120', 'kinetics', 'FPHA'], default='ntu120')
-parser.add_argument('modality', type=str, choices=['Appearance', 'Motion', 'RGB'], default='Appearance')
 parser.add_argument('train_list', type=str, default='./annotations/FPHA_train_list.txt')
 parser.add_argument('--val_list', type=str, default='./annotations/FPHA_val_list.txt')
 
@@ -21,7 +20,7 @@ parser.add_argument('--loss_type', type=str, default="nll",
 parser.add_argument('--epochs', default=60, type=int, metavar='N',
                     help='number of total epochs to run')
 parser.add_argument('-b', '--batch-size', default=1, type=int,
-                    metavar='N', help='mini-batch size (TSN_default: 128)')
+                    metavar='N', help='mini-batch size (Trear_default: 128)')
 parser.add_argument('--lr', '--learning-rate', default=0.001, type=float,
                     metavar='LR', help='initial learning rate')
 parser.add_argument('--lr_steps', default=[20, 40], type=float, nargs="+",

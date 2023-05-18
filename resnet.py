@@ -34,8 +34,9 @@ def conv1x1(in_planes, out_planes, stride=1):
 class BasicBlock(nn.Module):
     expansion = 1
 
-    def __init__(self, inplanes, planes, stride=1, downsample=None):
+    def __init__(self, inplanes, planes, stride=1, downsample=None, dilation=1):
         super(BasicBlock, self).__init__()
+        
         self.conv1 = conv3x3(inplanes, planes, stride)
         self.bn1 = nn.BatchNorm2d(planes)
         self.relu = nn.ReLU(inplace=True)
@@ -57,7 +58,7 @@ class BasicBlock(nn.Module):
 
         if self.downsample is not None:
             residual = self.downsample(x)
-
+        
         out += residual
         out = self.relu(out)
 
@@ -77,9 +78,6 @@ class Bottleneck(nn.Module):
         self.bn3 = nn.BatchNorm2d(planes * self.expansion)
         self.relu = nn.ReLU(inplace=True)
 
-        # self.ca = ChannelAttention(planes * 4)
-        # self.sa = SpatialAttention()
-
         self.downsample = downsample
         self.stride = stride
 
@@ -96,10 +94,7 @@ class Bottleneck(nn.Module):
 
         out = self.conv3(out)
         out = self.bn3(out)
-
-        # out = self.ca(out) * out
-        # out = self.sa(out) * out
-
+        
         if self.downsample is not None:
             residual = self.downsample(x)
 
@@ -110,7 +105,6 @@ class Bottleneck(nn.Module):
 
         
 class ResNet(nn.Module):
-    # resnet101: [3, 4, 23, 3]
     def __init__(self, block, layers, num_classes=1000):
         self.inplanes = 64
         super(ResNet, self).__init__()
@@ -127,7 +121,7 @@ class ResNet(nn.Module):
         self.conv02 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3, bias=False)
         self.bn02 = nn.BatchNorm2d(64)
         self.relu = nn.ReLU(inplace=True)
-        self.maxpool02 = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)        
+        self.maxpool02 = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)    
         self.layer05 = self._make_layer(block, 64, layers[0])
         self.layer06 = self._make_layer(block, 128, layers[1], stride=2)
         self.layer07 = self._make_layer(block, 256, layers[2], stride=2)
@@ -145,6 +139,7 @@ class ResNet(nn.Module):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
 
+
     def _make_layer(self, block, planes, blocks, stride=1, dilation=1):
         downsample = None
         if stride != 1 or self.inplanes != planes * block.expansion:
@@ -152,6 +147,7 @@ class ResNet(nn.Module):
                 conv1x1(self.inplanes, planes * block.expansion, stride),
                 nn.BatchNorm2d(planes * block.expansion),
             )
+
 
         layers = []
         layers.append(block(self.inplanes, planes, stride, downsample, dilation=dilation))
@@ -169,28 +165,59 @@ class ResNet(nn.Module):
 
     def forward(self, x):
         x1, x2 = x.split(3, dim=1) # split two images     
+        
+        '''
+        print(x.shape, x1.shape, x2.shape)
+        import matplotlib.pyplot as plt
+        img = x1.clone().detach().to('cpu')
+        for k in range(int(img.shape[0])):
+            for i in range(int(img.shape[1]/3)):
+                r = img[k][3*i].clone() * 0.226 + 0.5
+                r = r.unsqueeze(0)
+                g = img[k][3*i+1].clone()* 0.226 + 0.5
+                g = g.unsqueeze(0)
+                b = img[k][3*i+2].clone()* 0.226 + 0.5
+                b = b.unsqueeze(0)
+                
+                full = torch.cat((r,g,b),dim=0)
+                plt.imshow(full.permute(1, 2, 0))
+                plt.show()
+                
+        img = x2.clone().detach().to('cpu')
+        for k in range(int(img.shape[0])):
+            for i in range(int(img.shape[1]/3)):
+                r = img[k][3*i].clone() * 0.226 + 0.5
+                r = r.unsqueeze(0)
+                g = img[k][3*i+1].clone()* 0.226 + 0.5
+                g = g.unsqueeze(0)
+                b = img[k][3*i+2].clone()* 0.226 + 0.5
+                b = b.unsqueeze(0)
+                
+                full = torch.cat((r,g,b),dim=0)
+                plt.imshow(full.permute(1, 2, 0))
+                plt.show()  
+        #'''
 
-        x1 = self.conv1(x1)     # (64,112,112)
+        ######  RGB Encoder ######
+        x1 = self.conv1(x1)
         x1 = self.bn1(x1)
         x1 = self.relu(x1)
-        x1 = self.maxpoo1(x1)      # (64,56,56)
+        x1 = self.maxpoo1(x1)
+        x1 = self.layer1(x1)
+        x1 = self.layer2(x1)
+        x1 = self.layer3(x1)
+        x1 = self.layer4(x1) 
+        
+        ######  Depth Encoder ######
         x2 = self.conv02(x2)
         x2 = self.bn02(x2)
         x2 = self.relu(x2)
         x2 = self.maxpool02(x2)
-
-        x1 = self.layer1(x1)    # (64,56,56)
-        x2 = self.layer05(x2)   # (64,56,56)
-
-        x1 = self.layer2(x1)
+        x2 = self.layer05(x2)
         x2 = self.layer06(x2)
-
-        x1 = self.layer3(x1)    # (1024,14,14)
-        x2 = self.layer07(x2)   # (1024,14,14)
-
-        x1 = self.layer4(x1)    # (_,2048,7,7)
+        x2 = self.layer07(x2) 
         x2 = self.layer08(x2)
-
+                
         return [x1, x2]
 
 
@@ -289,14 +316,11 @@ def resnet50(pretrained=False, **kwargs):
         pretrained (bool): If True, returns a model pre-trained on ImageNet
     """
     model = ResNet(Bottleneck, [3, 4, 6, 3], **kwargs)
-
     if pretrained:
         print("resnet_50 RGB-D model parameters loading from pretrain...")
         pretrain = model_zoo.load_url(model_urls['resnet50'])
-        # pretrain = torch.load('/home/liulb/liuz/dscmt/models/resnet50-19c8e357.pth', map_location='cpu')
         init_from_pretrain(model=model, pretrain=pretrain, strict=False)
     else:
-        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
         xavier(model)
     return model
 
@@ -310,7 +334,6 @@ def resnet101(pretrained=False, **kwargs):
     if pretrained:
         print("resnet_101 RGB-D model parameters loading from pretrain...")
         pretrain = model_zoo.load_url(model_urls['resnet101'])
-        #pretrain = torch.load('./models/resnet101-5d3b4d8f.pth', map_location='cpu')
         init_from_pretrain(model=model, pretrain=pretrain, strict=False)
     else:
         xavier(model)

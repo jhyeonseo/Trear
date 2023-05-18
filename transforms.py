@@ -6,6 +6,8 @@ import numbers
 import math
 import torch
 
+import matplotlib.pyplot as plt
+
 
 class GroupRandomCrop(object):
     def __init__(self, size):
@@ -48,10 +50,16 @@ class GroupRandomHorizontalFlip(object):
     def __init__(self, is_flow=False):
         self.is_flow = is_flow
 
-    def __call__(self, img_group, is_flow=False):
+    def __call__(self, img_group, is_flow=False):        
         v = random.random()
+            
         if v < 0.5:
             ret = [img.transpose(Image.FLIP_LEFT_RIGHT) for img in img_group]
+            '''
+            for img in ret:
+                plt.imshow(img)
+                plt.show()
+            '''
             if self.is_flow:
                 for i in range(0, len(ret), 2):
                     ret[i] = ImageOps.invert(ret[i])  # invert flow pixel values when flipping
@@ -71,8 +79,12 @@ class GroupNormalize(object):
 
         # TODO: make efficient
         for t, m, s in zip(tensor, rep_mean, rep_std):
+            
             t.sub_(m).div_(s)
-
+            
+            #print(torch.mean(t))
+            #print(torch.var(t))
+            
         return tensor
 
 
@@ -188,12 +200,32 @@ class GroupMultiScaleCrop(object):
     def __call__(self, img_group):
 
         im_size = img_group[0].size
-
+        
+        
+        ###### 기존 Cropping ######
+        '''
         crop_w, crop_h, offset_w, offset_h = self._sample_crop_size(im_size)
         crop_img_group = [img.crop((offset_w, offset_h, offset_w + crop_w, offset_h + crop_h)) for img in img_group]
-        ret_img_group = [img.resize((self.input_size[0], self.input_size[1]), self.interpolation)
-                         for img in crop_img_group]
-        return ret_img_group
+        ret_img_group = [img.resize((self.input_size[0], self.input_size[1])) for img in crop_img_group]
+        #'''
+
+        #'''
+        ret_img_group = [img.resize((256, 256)) for img in img_group]
+        crop_img_group = []
+        for img in ret_img_group:
+            random_number_x = random.randint(0, 255 - self.input_size[0])
+            random_number_y = random.randint(0, 255 - self.input_size[1])
+            crop_img_group.append(img.crop((random_number_x, random_number_y, random_number_x + self.input_size[0], random_number_y + self.input_size[1])))
+            #print(random_number_x, random_number_y, random_number_x + self.input_size[0], random_number_y + self.input_size[1])
+        #'''   
+
+        '''    
+        for img in ret_img_group:
+            plt.imshow(img)
+            plt.show()
+        '''
+        
+        return crop_img_group
 
     def _sample_crop_size(self, im_size):
         image_w, image_h = im_size[0], im_size[1]
@@ -297,7 +329,6 @@ class GroupRandomSizedCrop(object):
 
 
 class Stack(object):
-
     def __init__(self, roll=False):
         self.roll = roll
 
@@ -308,8 +339,7 @@ class Stack(object):
             if self.roll:
                 return np.concatenate([np.array(x)[:, :, ::-1] for x in img_group], axis=2)
             else:
-                return np.concatenate(img_group, axis=2)
-
+                return np.concatenate(img_group, axis=2)    # axis = 2 
 
 class ToTorchFormatTensor(object):
     """ Converts a PIL.Image (RGB) or numpy.ndarray (H x W x C) in the range [0, 255]
@@ -321,6 +351,22 @@ class ToTorchFormatTensor(object):
         if isinstance(pic, np.ndarray):
             # handle numpy array
             img = torch.from_numpy(pic).permute(2, 0, 1).contiguous()
+        
+            '''
+            for i in range(int(img.shape[0]/3)):
+                r = img[3*i].clone()
+                r = r.unsqueeze(0)
+                g = img[3*i+1].clone()
+                g = g.unsqueeze(0)
+                b = img[3*i+2].clone()
+                b = b.unsqueeze(0)
+                
+                full = torch.cat((r,g,b),dim=0)
+                print(full.shape)
+                plt.imshow(full.permute(1, 2, 0))
+                plt.show() 
+            '''
+            
         else:
             # handle PIL Image
             img = torch.ByteTensor(torch.ByteStorage.from_buffer(pic.tobytes()))

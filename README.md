@@ -32,11 +32,9 @@
 #### To train a model, use the `main.py` script.
 
 ```
-python main.py FPHA Motion ./annotations/FPHA_train_list.txt  --arch resnet50 --num_segment 3 --lr 0.0001 --lr_steps 30 60 --epochs 50 -b 4 --snapshot_pref train --val_list ./annotations/FPHA_test_list.txt --gpus 0
+python main.py FPHA ./annotations/FPHA_train_list.txt  --arch resnet34 --num_segment 16 --lr 0.0001 --lr_steps 30 --epochs 50 -b 4 --snapshot_pref train --val_list ./annotations/FPHA_val_list.txt --gpus 0
 ```
 
-#### You can see the final test result at the end of the epoch like below form.
-`Test Results: rgb Prec@5 96.522 Loss 3.80745        depth Prec@5 97.391 Loss 3.80802        fus Prec@5 97.565 Loss 3.81364`
 # Citation
 ```
 @InProceedings{
